@@ -109,8 +109,20 @@
 
   /* ---------- Modales ---------- */
   .gatekeeper-overlay {
-    position: fixed; inset: 0; background: rgba(4, 2, 8, 0.94); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    position: fixed; inset: 0; background: rgba(4, 2, 8, 0.985); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
     z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  /* Con el body scrolleable detrás, Safari/Chrome iOS a veces no repintan
+     bien el fondo del overlay contra el borde inferior real de la pantalla
+     (cambia de tamaño la barra de Safari) y se ve la mesa de fondo "filtrada".
+     Congelar el body por completo mientras el gatekeeper o el PIN están
+     abiertos elimina esa superficie de scroll y con ella el bug. */
+  body.overlay-abierto {
+    position: fixed;
+    left: 0; right: 0;
+    overflow: hidden;
+    width: 100%;
   }
   .gatekeeper-card {
     background: linear-gradient(180deg, #170c26 0%, #0e0617 100%);
@@ -127,13 +139,32 @@
   .gatekeeper-form label { font-family: var(--serif-display); font-size: 0.72rem; color: var(--gold-light); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 5px; display:block; }
   .gatekeeper-form input {
     background: #180a27; border: 1px solid #4a2870; color: var(--gold-light); padding: 12px 14px;
-    border-radius: 3px; font-size: 1rem; outline: none; width: 100%; font-family: var(--serif-body);
+    border-radius: 3px; font-size: 1rem; outline: none; width: 100%; max-width: 100%; min-width: 0;
+    font-family: var(--serif-body);
   }
-  /* Safari en iPhone le fuerza a input[type=date] un ancho interno mínimo
-     que ignora el width:100% de arriba, y el campo termina desbordando
-     la tarjeta hacia la derecha. Esta línea es el fix documentado de WebKit. */
+  /* Los <div> que envuelven label+input son ítems flex de .gatekeeper-form
+     (flex-direction:column). Por defecto un ítem flex no se achica por debajo
+     del ancho de su contenido ("min-width:auto"), así que si el contenido
+     (el input[type=date] de iOS) pide más ancho interno del disponible,
+     empuja la tarjeta entera hacia la derecha. min-width:0 se lo permite. */
+  .gatekeeper-form > div { min-width: 0; }
+  /* Safari/Chrome en iPhone (ambos usan WebKit) le imponen a input[type=date]
+     un ancho interno mínimo (por sus sub-campos día/mes/año) que ignora el
+     width:100% de arriba y el campo termina desbordando la tarjeta hacia la
+     derecha. -webkit-min-logical-width es el hack viejo; appearance:none +
+     min/max-width explícitos es lo que realmente lo contiene hoy. */
   input[type="date"] {
     -webkit-min-logical-width: 0%;
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 48px;
+  }
+  /* Bloque interno donde iOS dibuja el valor del selector de fecha */
+  input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;
+    min-height: 1.3em;
   }
   .gatekeeper-form input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(212,175,55,.18); }
   .gate-btn {
@@ -4846,6 +4877,32 @@ function ocultarWAAlEscribir() {
   chatInput.addEventListener('blur', () => waContainer.classList.remove('wa-oculto'));
 }
 ocultarWAAlEscribir();
+
+// FIX: bloquea el scroll del body mientras el gatekeeper o el PIN están
+// abiertos (ver comentario en body.overlay-abierto). Usa un MutationObserver
+// sobre el atributo style de ambos modales para no tener que tocar cada uno
+// de los lugares del código que ya hacen modal.style.display='flex'/'none'.
+let scrollGuardadoOverlay = 0;
+function actualizarBloqueoScrollOverlay() {
+  const gate = document.getElementById('gatekeeperModal');
+  const pin = document.getElementById('pinModal');
+  const hayOverlayAbierto = (gate && gate.style.display !== 'none') || (pin && pin.style.display !== 'none');
+  const yaBloqueado = document.body.classList.contains('overlay-abierto');
+  if (hayOverlayAbierto && !yaBloqueado) {
+    scrollGuardadoOverlay = window.scrollY || window.pageYOffset || 0;
+    document.body.style.top = `-${scrollGuardadoOverlay}px`;
+    document.body.classList.add('overlay-abierto');
+  } else if (!hayOverlayAbierto && yaBloqueado) {
+    document.body.classList.remove('overlay-abierto');
+    document.body.style.top = '';
+    window.scrollTo(0, scrollGuardadoOverlay);
+  }
+}
+['gatekeeperModal', 'pinModal'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) new MutationObserver(actualizarBloqueoScrollOverlay).observe(el, { attributes: true, attributeFilter: ['style'] });
+});
+actualizarBloqueoScrollOverlay();
 
 // INICIO
 cargarEstadoVacio();
