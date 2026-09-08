@@ -7,6 +7,8 @@
 <meta name="description" content="Grimorio &amp; Oráculo: tirá tus cartas de Tarot y conversá con Anto, lectura honesta y sin vueltas.">
 <meta name="theme-color" content="#030106">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Grimorio &amp; Oráculo">
 <meta property="og:title" content="Grimorio &amp; Oráculo — Tarot con Anto">
@@ -126,6 +128,12 @@
   .gatekeeper-form input {
     background: #180a27; border: 1px solid #4a2870; color: var(--gold-light); padding: 12px 14px;
     border-radius: 3px; font-size: 1rem; outline: none; width: 100%; font-family: var(--serif-body);
+  }
+  /* Safari en iPhone le fuerza a input[type=date] un ancho interno mínimo
+     que ignora el width:100% de arriba, y el campo termina desbordando
+     la tarjeta hacia la derecha. Esta línea es el fix documentado de WebKit. */
+  input[type="date"] {
+    -webkit-min-logical-width: 0%;
   }
   .gatekeeper-form input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(212,175,55,.18); }
   .gate-btn {
